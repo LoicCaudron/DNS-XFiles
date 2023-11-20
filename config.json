@@ -1,0 +1,6 @@
+{
+    "minTimeSleep": 0.5,
+    "maxTimeSleep": 1,
+    "minBytesRead": 1,
+    "maxBytesRead": 500
+  }
