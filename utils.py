@@ -18,3 +18,20 @@ def encode_base32(data):
         return encoded_data
     else:
         raise ValueError("Data type not supported. Please provide string or binary data.")
+'''
+def decode_base32(encoded_data):
+    try:
+        decoded_data = base64.b32decode(encoded_data.encode('utf-8')).decode('utf-8')
+        return decoded_data
+    except base64.binascii.Error as e:
+        raise ValueError("Invalid base32 encoded data: {}".format(str(e)))
+'''
+def decode_base32(encoded_data):
+    try:
+        if isinstance(encoded_data, str):
+            encoded_data = encoded_data.encode('utf-8')
+        
+        decoded_data = base64.b32decode(encoded_data)
+        return decoded_data
+    except base64.binascii.Error as e:
+        raise ValueError("Invalid base32 encoded data: {}".format(str(e)))
