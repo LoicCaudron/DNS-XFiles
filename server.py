@@ -63,7 +63,7 @@ class FileReconstructor:
             if self.domain in str(q.qname):
             
                 # Check if it is the initialization request (NFXGS5A = base32(INIT))
-                if "NFXGS5A" in str(q.qname).upper():
+                if ".NFXGS5A." in str(q.qname).upper():
                     qname_parts = str(q.qname).split(".")
                     print(qname_parts)
 
@@ -93,11 +93,13 @@ class FileReconstructor:
                         print(f"Created a buffer for file {filename} with checksum {checksum}")
                     
                     
-                    reply = dnslib.DNSRecord(dnslib.DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q)	
+                    reply = dnslib.DNSRecord(dnslib.DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q) 
+                    reply.add_answer(dnslib.RR(query.q.qname, dnslib.QTYPE.TXT, rdata=dnslib.TXT(""), ttl=60))
+
                     #reply.add_answer(dnslib.RR(query.q.qname, dnslib.QTYPE.TXT, rdata=dnslib.TXT("OK")))
                     self.sock.sendto(reply.pack(), address)
 
-                elif "MVXGI" in str(q.qname).upper():
+                elif ".MVXGI." in str(q.qname).upper():
 
                     qname_parts = str(q.qname).split(".")
                     print(qname_parts)
@@ -112,7 +114,8 @@ class FileReconstructor:
 
                     if self.files[sessionid]['total_chunks'] == len(self.files[sessionid]['data']):
 
-                        reply = dnslib.DNSRecord(dnslib.DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q)	
+                        reply = dnslib.DNSRecord(dnslib.DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q)
+                        reply.add_answer(dnslib.RR(query.q.qname, dnslib.QTYPE.TXT, rdata=dnslib.TXT("done"), ttl=60))
                         self.sock.sendto(reply.pack(), address)
 
                         #print(self.files[sessionid]['packets_order'])
@@ -166,7 +169,8 @@ class FileReconstructor:
                         self.files[sessionid]['data'].append(data)
                         self.files[sessionid]['packets_order'].append(chunk)
                     
-                    reply = dnslib.DNSRecord(dnslib.DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q)	
+                    reply = dnslib.DNSRecord(dnslib.DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q)
+                    reply.add_answer(dnslib.RR(query.q.qname, dnslib.QTYPE.TXT, rdata=dnslib.TXT(chunk), ttl=60))
                     self.sock.sendto(reply.pack(), address)
 
 
