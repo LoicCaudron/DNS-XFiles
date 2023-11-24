@@ -94,9 +94,8 @@ class FileReconstructor:
                     
                     
                     reply = dnslib.DNSRecord(dnslib.DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q) 
-                    reply.add_answer(dnslib.RR(query.q.qname, dnslib.QTYPE.TXT, rdata=dnslib.TXT(""), ttl=60))
+                    reply.add_answer(dnslib.RR(query.q.qname, dnslib.QTYPE.TXT, rdata=dnslib.TXT("hndshk"), ttl=60))
 
-                    #reply.add_answer(dnslib.RR(query.q.qname, dnslib.QTYPE.TXT, rdata=dnslib.TXT("OK")))
                     self.sock.sendto(reply.pack(), address)
 
                 elif ".MVXGI." in str(q.qname).upper():
