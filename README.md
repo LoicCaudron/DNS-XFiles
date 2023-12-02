@@ -87,10 +87,10 @@ options:
 }
 ```
 
-- minTimeSleep: minimum delay between each DNS query
-- maxTimeSleep: maximum delay between each DNS query
-- minSizeRequest: minimum size of the DNS queries
-- maxSizeRequest: maximum size of the DNS queries
+- minTimeSleep: minimum delay between each DNS query (in seconds)
+- maxTimeSleep: maximum delay between each DNS query (in seconds)
+- minSizeRequest: minimum size of the DNS queries (in bytes)
+- maxSizeRequest: maximum size of the DNS queries (in bytes)
 
 
 
