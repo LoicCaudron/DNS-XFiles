@@ -11,21 +11,23 @@ from dpkt import dns
 from utils import *
 
 def fromBase32(msg):
-	# Base32 decoding, we need to add the padding back
-	# Add padding characters
-	mod = len(msg) % 8
-	if mod == 2:
-		padding = "======"
-	elif mod == 4:
-		padding = "===="
-	elif mod == 5:
-		padding = "==="
-	elif mod == 7:
-		padding = "="
-	else:
-		padding = ""
-
-	return base64.b32decode(msg.upper() + padding)
+    # Base32 decoding, we need to add the padding back
+    # Add padding characters
+    mod = len(msg) % 8
+    if mod == 2:
+        padding = "======"
+    elif mod == 4:
+        padding = "===="
+    elif mod == 5:
+        padding = "==="
+    elif mod == 7:
+        padding = "="
+    else:
+        padding = ""
+            
+	#return base64.b32decode(msg.upper() + padding)
+    return decode_base32(msg.upper() + padding)
+    
 
 class FileReconstructor:
     def __init__(self, args):
@@ -131,7 +133,8 @@ class FileReconstructor:
                         content = ''.join(str(v) for v in self.files[sessionid]['data'])
                         #print('content:')
                         #print(content)
-                        decoded_content = decode_base32(content)                        
+                        #decoded_content = decode_base32(content)
+                        decoded_content = fromBase32(content)                      
 
                         try:
                             with open(filename, 'wb') as f:
@@ -179,9 +182,9 @@ def signal_handler(sig, frame):
 
 def main():
 
-    parser = argparse.ArgumentParser(description='DNS-XFile (LoicCaudron)')
+    parser = argparse.ArgumentParser(description='DNS-XFiles (LoicCaudron)')
     parser.add_argument('-s', '--socket', action="store", dest="socket", default='0.0.0.0:53',
-                        help="The upstream server for making DNS requests and the port (eg. '-s 127.0.0.1:53')")
+                        help="The upstream server for making DNS requests and the port (eg. '-s 0.0.0.0:53')")
     parser.add_argument('-d', '--domain', action="store", dest="domain",
                         help="The domain to make requests for. (eg. '-d test.com')")
     args = parser.parse_args()
