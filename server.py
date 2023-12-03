@@ -7,7 +7,6 @@ import argparse
 import socket
 import dnslib
 import base64
-from dpkt import dns
 from utils import *
 
 def fromBase32(msg):
