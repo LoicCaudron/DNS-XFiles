@@ -151,8 +151,8 @@ class FileExfiltrator(threading.Thread):
                 MAX_SIZE_REQUEST = MIN_SIZE_REQUEST
             
             #MIN_BYTES_READ, MAX_BYTES_READ
-            print(MIN_SIZE_REQUEST)
-            print(MAX_SIZE_REQUEST)
+            #print(MIN_SIZE_REQUEST)
+            #print(MAX_SIZE_REQUEST)
             random_size = random.randint(MIN_SIZE_REQUEST, MAX_SIZE_REQUEST)
 
             remaining_size = random_size - fixed_parts_size
@@ -280,11 +280,14 @@ def main():
     print('Files:', args.file)
     print('Domains:', args.domain, '\n')
 
-    with open('config.json') as json_file:
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    json_file_path = os.path.join(script_directory, 'config.json')
+
+    with open(json_file_path) as json_file:
         config = json.load(json_file)
 
-    MIN_TIME_SLEEP = int(config['minTimeSleep'])
-    MAX_TIME_SLEEP = int(config['maxTimeSleep'])
+    MIN_TIME_SLEEP = float(config['minTimeSleep'])
+    MAX_TIME_SLEEP = float(config['maxTimeSleep'])
     MIN_SIZE_REQUEST = int(config['minSizeRequest'])
     MAX_SIZE_REQUEST = int(config['maxSizeRequest'])
 
