@@ -16,8 +16,8 @@ DNS-XFiles can operate both locally and over a network. In the latter case, you 
 ### ⚠️ Disclaimer ⚠️
 > 
 > The DNS-XFiles repository and its software are intended for educational and research purposes only. 
-    - either on your own systems as a means of learning, of demonstrating what can be done and how, or testing your defense and detection mechanisms
-    - on systems you've been officially and legitimately entitled to perform some security assessments (pentest, security audits)
+    > - either on your own systems as a means of learning, of demonstrating what can be done and how, or testing your defense and detection mechanisms
+    > - on systems you've been officially and legitimately entitled to perform some security assessments (pentest, security audits)
 >    
 > Use of DNS-XFiles for illegal activities or unauthorized access is strictly prohibited. The authors and contributors are not responsible for any misuse or damages caused by the use of this software.
 
